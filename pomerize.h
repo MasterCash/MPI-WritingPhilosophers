@@ -81,11 +81,11 @@ class pomerize {
 					break;
 				case 2:
 					randLine = (rand() % line2.size());
-					toReturn =  line2[randLine];					
+					toReturn =  line2[randLine];
 					break;
 				case 3:
 					randLine = (rand() % line3.size());
-					toReturn =  line3[randLine];					
+					toReturn =  line3[randLine];
 					break;
 			}
 			return toReturn;

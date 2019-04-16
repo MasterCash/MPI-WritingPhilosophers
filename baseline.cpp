@@ -1,6 +1,10 @@
+/* Names: Josh Cash and Hannah Reinbolt
+** Date: 4-16-2019
+** Assignment: Writing Phils Homework
+*/
 #include <cstdlib>
 #include <iostream>
-#include <fstream>
+#include <fstream> 
 #include <cerrno>
 #include <unistd.h>
 #include "mpi.h"
@@ -10,18 +14,28 @@
 
 using namespace std;
 
+const int ASK = 0;
+const int DONE = 1;
+const int EXIT = 2;
+
 //this is how many poems you want each Phil to construct & save
-const int MAXMESSAGES = 10; 
+const int MAXMESSAGES = 10;
 
 //if you change this base, update the Makefile "clean" accordingly
-const string fileBase = "outFile"; 
+const string fileBase = "outFile";
 
-int main ( int argc, char *argv[] ) 
+int main ( int argc, char *argv[] )
 {
   int id; //my MPI ID
   int p;  //total MPI processes
   MPI::Status status;
   int tag = 1;
+
+  // control vars for left and right side
+  bool rightOpen = false;
+  bool leftOpen = false;
+  bool rightExited = false;
+  bool leftExited = false;
 
   //  Initialize MPI.
   MPI::Init ( argc, argv );
@@ -31,13 +45,27 @@ int main ( int argc, char *argv[] )
 
   //  Determine the rank of this process.
   id = MPI::COMM_WORLD.Get_rank ( );
-  
+
   //Safety check - need at least 2 philosophers to make sense
   if (p < 2) {
-	    MPI::Finalize ( );
-	    std::cerr << "Need at least 2 philosophers! Try again" << std::endl;
-	    return 1; //non-normal exit
+    MPI::Finalize ( );
+    std::cerr << "Need at least 2 philosophers! Try again" << std::endl;
+    return 1; //non-normal exit
   }
+
+  // first person gets both access
+  if(id == p -1)
+  {
+    rightOpen = true;
+    leftOpen = true;
+  }
+  // everyone else but last gets left
+  else if(id != 0)
+  {
+    leftOpen = true;
+  }
+  // last gets none poor Philosopher
+
 
   srand(id + time(NULL)); //ensure different seeds...
 
@@ -55,29 +83,42 @@ int main ( int argc, char *argv[] )
   ofstream foutLeft(lFile.c_str(), ios::out | ios::app );
   ofstream foutRight(rFile.c_str(), ios::out | ios::app );
 
-  while (numWritten < MAXMESSAGES) {
-    //send 1 test message to each neighbor
-    msgOut = rand() % p; //pick a number/message
-    MPI::COMM_WORLD.Send ( &msgOut, 1, MPI::INT, leftNeighbor, tag ); 
-    msgOut = rand() % p; //pick a new number/message
-    MPI::COMM_WORLD.Send ( &msgOut, 1, MPI::INT, rightNeighbor, tag ); 
+  while (numWritten < MAXMESSAGES)
+  {
+    if(!leftOpen || !rightOpen)
+    {
+      msgOut = ASK;
+      if(!leftOpen && !leftExited)
+      {
+        cerr << id << ": send to Left: " << msgOut << endl;
+        MPI::COMM_WORLD.Send (&msgOut, 1, MPI::INT, leftNeighbor, tag);
+        cerr << id << ": sent to Left: " << msgOut << endl;
+        cerr << id << ": Recving from Left: " << endl;
+        MPI::COMM_WORLD.Recv (&msgIn, 1, MPI::INT, leftNeighbor, tag, status);
+        cerr << id << ": Recvd form Left: " << msgIn << endl;
+        if(msgIn == DONE)
+          leftOpen = true;
+        else if(msgIn == EXIT)
+          leftExited = true;
+      }
+      if(!rightOpen && !rightExited)
+      {
+        cerr << id << ": send to Right: " << msgOut << endl;
+        MPI::COMM_WORLD.Send (&msgOut, 1, MPI::INT, rightNeighbor, tag);
+        cerr << id << ": sent to Right: " << msgOut << endl;
+        cerr << id << ": Recving from Right: " << msgOut << endl;
+        MPI::COMM_WORLD.Recv (&msgIn, 1, MPI::INT, rightNeighbor, tag, status);
+        cerr << id << ": Recvd from Right: " << msgOut << endl;
+        if(msgIn == DONE)
+          rightOpen = true;
+        else if(msgIn == EXIT)
+          rightExited = true;
+      }
+    }
 
-    //receive 1 test message from each neighbor
-    MPI::COMM_WORLD.Recv ( &msgIn, 1, MPI::INT, MPI::ANY_SOURCE, tag, status );
-    std::cout << "ID " << id << " receiving message " << msgIn << " from Philosopher ";
-    std::cout << status.Get_source() << std::endl;
-
-    MPI::COMM_WORLD.Recv ( &msgIn, 1, MPI::INT, MPI::ANY_SOURCE, tag, status );
-    std::cout << "ID " << id << " receiving message " << msgIn << " from Philosopher ";
-    std::cout << status.Get_source() << std::endl;
-
-    //LET'S JUST IGNORE THE MESSAGES AND ASSUME IT'S SAFE TO WRITE TO THE FILE!
-    //std::cout << "ID: " << id << " CARELESSLY writing to " << lFile << " and " << rFile << endl;
-    //If you want to see correct poems, change MAXMESSAGES to something VERY small and add this sleep
-    //sleep(id); //will delay each process so the initial interleaving(s) will likely be OK
-  
     //construct poem & output stanzas into the files 'simultaneously'
     //we do this with an intermediate variable so both files contain the same poem!
+    cerr << id << ": Printing to files right and left" << endl;
     foutLeft << id << "'s poem:" << endl;
     foutRight << id << "'s poem:" << endl;
 
@@ -95,6 +136,48 @@ int main ( int argc, char *argv[] )
     foutRight << stanza3 << endl << endl;
 
     numWritten++;
+    
+    cerr << id << ": Printing finished" << endl;
+    if(leftOpen)
+    {
+      cerr << id << ": listening for calls for Left side from left Neighbor" << endl;
+      MPI::COMM_WORLD.Recv (&msgIn, 1, MPI::INT, leftNeighbor, tag, status);
+      cerr << id << ": Finished listening for calls for Left side" << endl;
+      cerr << id << ": Recvd from Left: " << msgIn << endl;
+      
+      if(msgIn == ASK )
+      {
+        cerr << id << ": Giving up Left file" << endl;
+        leftOpen = false;
+        msgOut = (numWritten == MAXMESSAGES ? EXIT : DONE);
+        cerr << id << ": send to Left: " << msgOut << endl;
+        MPI::COMM_WORLD.Send (&msgOut, 1, MPI::INT, leftNeighbor, tag);
+      }
+      else if(msgIn == EXIT)
+      {
+        leftExited = true;
+      }
+    }
+    if(rightOpen)
+    {
+      cerr << id << ": listening for calls for Right side from Right Neighbor" << endl;
+      MPI::COMM_WORLD.Recv (&msgIn, 1, MPI::INT, rightNeighbor, tag, status);
+      cerr << id << ": Finished listening for calls for Right side" << endl;
+      cerr << id << ": Recvd from Right: " << msgIn << endl;
+      if(msgIn == ASK)
+      {
+        cerr << id << ": Giving up Right file" << endl;
+        rightOpen = false;
+        msgOut = (numWritten == MAXMESSAGES ? EXIT : DONE);
+        cerr << id << ": send to Right: " << msgOut << endl;
+        MPI::COMM_WORLD.Send (&msgOut, 1, MPI::INT, rightNeighbor, tag);
+      }
+      else if(msgIn == EXIT)
+      {
+        rightExited = true;
+      }
+    }
+
   }
 
   foutLeft.close();
