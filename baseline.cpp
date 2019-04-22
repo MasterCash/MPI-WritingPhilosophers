@@ -29,7 +29,7 @@ const string fileBase = "outFile";
 
 void output(ostream & foutRight, ostream & foutLeft, int id);
 
-bool trySend(const int, const int, const int, const bool = true);
+void trySend(const int, const int, const int);
 int tryRecv(const int, const int, const bool = true);
 
 void print(const string);
@@ -235,6 +235,7 @@ int main ( int argc, char *argv[] )
   return 0;
 }
 
+// Outputs to both files
 void output(ostream & foutRight, ostream & foutLeft, int id)
 {
   print(to_string(id) + ": Outputing");
@@ -258,23 +259,17 @@ void output(ostream & foutRight, ostream & foutLeft, int id)
   return;
 }
 
-bool trySend(const int id, const int msg, const int sender, const bool test)
+// tries to send a message
+void trySend(const int id, const int msg, const int sender)
 {
   print("" + to_string(id) + ": Trying to send Message to: " + to_string(sender) + " msg: " + to_string(msg));
-  int processed = 0;
   MPI::Status status;
   MPI::Request request = MPI::COMM_WORLD.Isend(&msg, 1, MPI::INT, sender, 1);
   print("" + to_string(id) + ": Tried to send Message to: " + to_string(sender) + " msg: " + to_string(msg));
-  if(false && test)
-  {
-    MPI_Test(request, &processed, status);
-    processed ?   
-      print("" + to_string(id) + ": Succeed to send Message to: " + to_string(sender) + " msg: " + to_string(msg)) : 
-      print("" + to_string(id) + ": Failed to send Message to: " + to_string(sender) + " msg: " + to_string(msg));
-  }
-  return processed;
+  return;
 }
 
+// tries to recieve a message and checks to see if it did. 
 int tryRecv(const int id, const int sender, const bool test)
 {
   print("" + to_string(id) + ": Trying to recv Message from: " + to_string(sender));
@@ -294,6 +289,7 @@ int tryRecv(const int id, const int sender, const bool test)
   return processed ? msg : NONE;
 }
 
+// used to print debug messages
 void print(const string s)
 {
   if(DEBUG)
