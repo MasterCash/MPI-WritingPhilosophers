@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include "mpi.h"
 #include "pomerize.h"
-#define DEBUG false
+#define DEBUG true 
 
 //run compiled code (for 5 philosophers) with mpirun -n 5 program
 
