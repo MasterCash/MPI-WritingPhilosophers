@@ -1,5 +1,5 @@
 # MPI-WritingPhilosophers
-An Assignment for CS3600 Operating Systems. Task: build a program to handle a ring of programs trying to write to same files using messaging
+An Assignment for CS3800 Operating Systems. Task: build a program to handle a ring of programs trying to write to same files using messaging
 # Prompt
 Implement a working Dining Philosopher-like program using MPI
 Each Philosopher will write to a file to its left and a file to its right for n times. Philosophers share the left file and right file with another Philosopher.
